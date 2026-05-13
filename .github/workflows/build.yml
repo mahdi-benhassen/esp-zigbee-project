@@ -23,28 +23,36 @@ jobs:
       - name: Checkout this repo
         uses: actions/checkout@v4
 
+      # Pre-stage the build directory IN the workspace with our sdkconfig.defaults.
+      # The esp-idf-ci-action Docker container mounts the workspace at /project,
+      # so $GITHUB_WORKSPACE is NOT available inside the container command.
+      # Solution: create the dir on the runner first, then let the command copy
+      # IDF's ot_rcp source into it using $IDF_PATH (which IS set by the action).
+      - name: Pre-stage RCP build directory
+        run: |
+          mkdir -p ot_rcp_build
+          cp config/rcp/sdkconfig.defaults ot_rcp_build/
+
       - name: Build RCP firmware via ESP-IDF action
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: ${{ env.IDF_VERSION }}
           target: esp32h2
-          # ot_rcp lives inside IDF itself, not the zigbee SDK
-          path: ""
-          command: >
-            cd $IDF_PATH/examples/openthread/ot_rcp &&
-            cp $GITHUB_WORKSPACE/config/rcp/sdkconfig.defaults . &&
-            idf.py set-target esp32h2 &&
+          # path is relative to workspace; Docker working dir = /project/ot_rcp_build
+          path: ot_rcp_build
+          command: |
+            cp -rn $IDF_PATH/examples/openthread/ot_rcp/. .
+            idf.py set-target esp32h2
             idf.py build
 
-      # Upload the compiled RCP binary so the Gateway job can grab it
       - name: Upload RCP build artifact
         uses: actions/upload-artifact@v4
         with:
           name: rcp-firmware
           path: |
-            /root/esp/idf/examples/openthread/ot_rcp/build/ot_rcp.bin
-            /root/esp/idf/examples/openthread/ot_rcp/build/bootloader/bootloader.bin
-            /root/esp/idf/examples/openthread/ot_rcp/build/partition_table/partition-table.bin
+            ot_rcp_build/build/ot_rcp.bin
+            ot_rcp_build/build/bootloader/bootloader.bin
+            ot_rcp_build/build/partition_table/partition-table.bin
           retention-days: 7
 
   # ─────────────────────────────────────────────

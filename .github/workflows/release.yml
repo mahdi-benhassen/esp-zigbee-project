@@ -20,24 +20,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pre-stage dir on the runner (where $GITHUB_WORKSPACE works).
+      # The Docker container gets $IDF_PATH but NOT $GITHUB_WORKSPACE,
+      # so we copy our sdkconfig here, then copy IDF source inside the container.
+      - name: Pre-stage RCP build directory
+        run: |
+          mkdir -p ot_rcp_build
+          cp config/rcp/sdkconfig.defaults ot_rcp_build/
+
       - name: Build RCP firmware
         uses: espressif/esp-idf-ci-action@v1
         with:
           esp_idf_version: ${{ env.IDF_VERSION }}
           target: esp32h2
-          path: ""
-          command: >
-            cd $IDF_PATH/examples/openthread/ot_rcp &&
-            cp $GITHUB_WORKSPACE/config/rcp/sdkconfig.defaults . &&
-            idf.py set-target esp32h2 &&
+          path: ot_rcp_build
+          command: |
+            cp -rn $IDF_PATH/examples/openthread/ot_rcp/. .
+            idf.py set-target esp32h2
             idf.py build
 
       - name: Package RCP binaries
         run: |
           mkdir -p release/rcp
-          cp /root/esp/idf/examples/openthread/ot_rcp/build/ot_rcp.bin              release/rcp/
-          cp /root/esp/idf/examples/openthread/ot_rcp/build/bootloader/bootloader.bin release/rcp/
-          cp /root/esp/idf/examples/openthread/ot_rcp/build/partition_table/partition-table.bin release/rcp/
+          cp ot_rcp_build/build/ot_rcp.bin                           release/rcp/
+          cp ot_rcp_build/build/bootloader/bootloader.bin            release/rcp/
+          cp ot_rcp_build/build/partition_table/partition-table.bin  release/rcp/
           cd release && zip -r ../rcp-firmware-${{ github.ref_name }}.zip rcp/
 
       - uses: actions/upload-artifact@v4
