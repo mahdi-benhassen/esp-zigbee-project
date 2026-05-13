@@ -1,0 +1,5 @@
+# RCP firmware sdkconfig.defaults
+# Enables the NCP vendor hook required by the Zigbee Gateway example
+
+# ── OpenThread RCP vendor hook (mandatory for Gateway) ──
+CONFIG_OPENTHREAD_NCP_VENDOR_HOOK=y

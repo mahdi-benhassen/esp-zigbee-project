@@ -1,0 +1,20 @@
+# Gateway firmware sdkconfig.defaults
+# These values replace idf.py menuconfig for CI builds
+# Edit WiFi credentials before flashing to real hardware!
+
+# ── Board pin wiring (CoreS3 ↔ Module Gateway H2) ──
+CONFIG_ZIGBEE_GW_RCP_RESET_PIN=7
+CONFIG_ZIGBEE_GW_RCP_BOOT_PIN=18
+CONFIG_ZIGBEE_GW_UART_TX_PIN=10
+CONFIG_ZIGBEE_GW_UART_RX_PIN=17
+
+# ── Auto-update RCP firmware on boot ──
+CONFIG_ZIGBEE_GW_AUTO_UPDATE_RCP=y
+
+# ── Wi-Fi (override at flash time or use menuconfig locally) ──
+# For CI the build just needs these keys to exist; values are placeholders.
+CONFIG_EXAMPLE_WIFI_SSID="YOUR_SSID"
+CONFIG_EXAMPLE_WIFI_PASSWORD="YOUR_PASSWORD"
+
+# ── UART baud rate ──
+CONFIG_ZIGBEE_UART_BAUDRATE=115200

@@ -1,0 +1,12 @@
+# NCP firmware sdkconfig.defaults (runs on Module Gateway H2 — ESP32-H2)
+# Pin numbers match the wiring described in the tutorial
+
+# ── UART pins to HOST (CoreS3) ──
+CONFIG_ZB_NCP_UART_RX_PIN=23
+CONFIG_ZB_NCP_UART_TX_PIN=24
+
+# ── Device role: Coordinator (also accepts Router or End Device) ──
+CONFIG_ZB_COORDINATOR_ROLE=y
+
+# ── UART baud rate ──
+CONFIG_ZB_NCP_UART_BAUDRATE=115200
