@@ -39,7 +39,7 @@ jobs:
         run: |
           . /opt/esp/idf/export.sh
           
-          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/zigbee_gateway
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
           idf.py set-target esp32s3
           idf.py build
 
@@ -47,32 +47,6 @@ jobs:
           cp build/esp_zigbee_gateway.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
           cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
           cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
-
-      - name: Build NCP (ESP32-H2)
-        run: |
-          . /opt/esp/idf/export.sh
-          
-          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp
-          idf.py set-target esp32h2
-          idf.py build
-
-          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/ncp
-          cp build/esp_zigbee_ncp.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
-          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
-          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
-
-      - name: Build HOST (ESP32-S3)
-        run: |
-          . /opt/esp/idf/export.sh
-          
-          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host
-          idf.py set-target esp32s3
-          idf.py build
-
-          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/host
-          cp build/esp_zigbee_host.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
-          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
-          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
