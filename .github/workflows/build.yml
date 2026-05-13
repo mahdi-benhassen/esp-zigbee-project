@@ -6,167 +6,81 @@ on:
   pull_request:
     branches: [main, develop]
 
-env:
-  IDF_VERSION: v5.3.1
-  ZIGBEE_SDK_REPO: https://github.com/espressif/esp-zigbee-sdk.git
-
 jobs:
   # ─────────────────────────────────────────────
-  # JOB 1 — Build RCP firmware (esp32h2)
-  #          Required before Gateway firmware
+  # Build All Firmware Binaries in One Container
   # ─────────────────────────────────────────────
-  build-rcp:
-    name: "RCP Firmware (ESP32-H2)"
+  build-all:
+    name: "Build All Firmware Binaries"
     runs-on: ubuntu-latest
+    container: espressif/idf:release-v5.3
 
     steps:
-      - name: Checkout this repo
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      # Pre-stage the build directory IN the workspace with our sdkconfig.defaults.
-      # The esp-idf-ci-action Docker container mounts the workspace at /project,
-      # so $GITHUB_WORKSPACE is NOT available inside the container command.
-      # Solution: create the dir on the runner first, then let the command copy
-      # IDF's ot_rcp source into it using $IDF_PATH (which IS set by the action).
-      - name: Pre-stage RCP build directory
-        run: |
-          mkdir -p ot_rcp_build
-          cp config/rcp/sdkconfig.defaults ot_rcp_build/
-
-      - name: Build RCP firmware via ESP-IDF action
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32h2
-          # path is relative to workspace; Docker working dir = /project/ot_rcp_build
-          path: ot_rcp_build
-          command: |
-            cp -rn $IDF_PATH/examples/openthread/ot_rcp/. .
-            idf.py set-target esp32h2
-            idf.py build
-
-      - name: Upload RCP build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: rcp-firmware
-          path: |
-            ot_rcp_build/build/ot_rcp.bin
-            ot_rcp_build/build/bootloader/bootloader.bin
-            ot_rcp_build/build/partition_table/partition-table.bin
-          retention-days: 7
-
-  # ─────────────────────────────────────────────
-  # JOB 2 — Build Gateway firmware (esp32s3)
-  # ─────────────────────────────────────────────
-  build-gateway:
-    name: "Gateway Firmware (ESP32-S3)"
-    runs-on: ubuntu-latest
-    needs: build-rcp          # wait for RCP build to succeed first
-
-    steps:
-      - name: Checkout this repo
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Clone ESP-Zigbee-SDK
+        run: git clone --recursive https://github.com/espressif/esp-zigbee-sdk.git
+
+      - name: Build RCP (ESP32-H2)
         run: |
-          git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
+          . /opt/esp/idf/export.sh
+          cp config/rcp/sdkconfig.defaults $IDF_PATH/examples/openthread/ot_rcp/
+          
+          cd $IDF_PATH/examples/openthread/ot_rcp
+          idf.py set-target esp32h2
+          idf.py build
 
-      - name: Copy Gateway sdkconfig.defaults
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/rcp
+          cp build/ot_rcp.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
+
+      - name: Build Gateway (ESP32-S3)
         run: |
-          cp config/gateway/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_gateway/
+          . /opt/esp/idf/export.sh
+          cp config/gateway/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
+          idf.py set-target esp32s3
+          idf.py build
 
-      - name: Build Gateway firmware via ESP-IDF action
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32s3
-          path: esp-zigbee-sdk/examples/esp_zigbee_gateway
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/gateway
+          cp build/esp_zigbee_gateway.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
 
-      - name: Upload Gateway build artifact
+      - name: Build NCP (ESP32-H2)
+        run: |
+          . /opt/esp/idf/export.sh
+          cp config/ncp/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp
+          idf.py set-target esp32h2
+          idf.py build
+
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/ncp
+          cp build/esp_zigbee_ncp.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/ncp/ || true
+
+      - name: Build HOST (ESP32-S3)
+        run: |
+          . /opt/esp/idf/export.sh
+          cp config/host/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host
+          idf.py set-target esp32s3
+          idf.py build
+
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/host
+          cp build/esp_zigbee_host.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/host/ || true
+
+      - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:
-          name: gateway-firmware
-          path: |
-            esp-zigbee-sdk/examples/esp_zigbee_gateway/build/esp_zigbee_gateway.bin
-            esp-zigbee-sdk/examples/esp_zigbee_gateway/build/bootloader/bootloader.bin
-            esp-zigbee-sdk/examples/esp_zigbee_gateway/build/partition_table/partition-table.bin
-          retention-days: 7
-
-  # ─────────────────────────────────────────────
-  # JOB 3 — Build NCP firmware (esp32h2)
-  # ─────────────────────────────────────────────
-  build-ncp:
-    name: "NCP Firmware (ESP32-H2)"
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout this repo
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Clone ESP-Zigbee-SDK
-        run: |
-          git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
-
-      - name: Copy NCP sdkconfig.defaults
-        run: |
-          cp config/ncp/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_ncp/
-
-      - name: Build NCP firmware via ESP-IDF action
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32h2
-          path: esp-zigbee-sdk/examples/esp_zigbee_ncp
-
-      - name: Upload NCP build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ncp-firmware
-          path: |
-            esp-zigbee-sdk/examples/esp_zigbee_ncp/build/esp_zigbee_ncp.bin
-            esp-zigbee-sdk/examples/esp_zigbee_ncp/build/bootloader/bootloader.bin
-            esp-zigbee-sdk/examples/esp_zigbee_ncp/build/partition_table/partition-table.bin
-          retention-days: 7
-
-  # ─────────────────────────────────────────────
-  # JOB 4 — Build HOST firmware (esp32s3)
-  # ─────────────────────────────────────────────
-  build-host:
-    name: "HOST Firmware (ESP32-S3)"
-    runs-on: ubuntu-latest
-    needs: build-ncp          # NCP must compile cleanly before host
-
-    steps:
-      - name: Checkout this repo
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Clone ESP-Zigbee-SDK
-        run: |
-          git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
-
-      - name: Copy HOST sdkconfig.defaults
-        run: |
-          cp config/host/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_host/
-
-      - name: Build HOST firmware via ESP-IDF action
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32s3
-          path: esp-zigbee-sdk/examples/esp_zigbee_host
-
-      - name: Upload HOST build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: host-firmware
-          path: |
-            esp-zigbee-sdk/examples/esp_zigbee_host/build/esp_zigbee_host.bin
-            esp-zigbee-sdk/examples/esp_zigbee_host/build/bootloader/bootloader.bin
-            esp-zigbee-sdk/examples/esp_zigbee_host/build/partition_table/partition-table.bin
+          name: zigbee-firmware-binaries
+          path: build_artifacts/
           retention-days: 7

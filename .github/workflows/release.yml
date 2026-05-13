@@ -5,179 +5,116 @@ on:
     tags:
       - 'v*.*.*'    # trigger on tags like v1.0.0, v1.2.3
 
-env:
-  IDF_VERSION: v5.3.1
-  ZIGBEE_SDK_REPO: https://github.com/espressif/esp-zigbee-sdk.git
-
 jobs:
   # ─────────────────────────────────────────────
-  # Build RCP (needed by Gateway)
+  # JOB 1 — Build and Package All Firmware
   # ─────────────────────────────────────────────
-  release-rcp:
-    name: "Release RCP (ESP32-H2)"
+  build-and-package:
+    name: "Build and Package Binaries"
     runs-on: ubuntu-latest
+    container: espressif/idf:release-v5.3
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # Pre-stage dir on the runner (where $GITHUB_WORKSPACE works).
-      # The Docker container gets $IDF_PATH but NOT $GITHUB_WORKSPACE,
-      # so we copy our sdkconfig here, then copy IDF source inside the container.
-      - name: Pre-stage RCP build directory
-        run: |
-          mkdir -p ot_rcp_build
-          cp config/rcp/sdkconfig.defaults ot_rcp_build/
-
-      - name: Build RCP firmware
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32h2
-          path: ot_rcp_build
-          command: |
-            cp -rn $IDF_PATH/examples/openthread/ot_rcp/. .
-            idf.py set-target esp32h2
-            idf.py build
-
-      - name: Package RCP binaries
-        run: |
-          mkdir -p release/rcp
-          cp ot_rcp_build/build/ot_rcp.bin                           release/rcp/
-          cp ot_rcp_build/build/bootloader/bootloader.bin            release/rcp/
-          cp ot_rcp_build/build/partition_table/partition-table.bin  release/rcp/
-          cd release && zip -r ../rcp-firmware-${{ github.ref_name }}.zip rcp/
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-rcp
-          path: rcp-firmware-${{ github.ref_name }}.zip
-
-  # ─────────────────────────────────────────────
-  # Build Gateway
-  # ─────────────────────────────────────────────
-  release-gateway:
-    name: "Release Gateway (ESP32-S3)"
-    runs-on: ubuntu-latest
-    needs: release-rcp
-
-    steps:
-      - uses: actions/checkout@v4
+      - name: Install zip utility
+        run: apt-get update && apt-get install -y zip
 
       - name: Clone ESP-Zigbee-SDK
-        run: git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
+        run: git clone --recursive https://github.com/espressif/esp-zigbee-sdk.git
 
-      - name: Copy sdkconfig
-        run: cp config/gateway/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_gateway/
-
-      - name: Build Gateway firmware
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32s3
-          path: esp-zigbee-sdk/examples/esp_zigbee_gateway
-
-      - name: Package Gateway binaries
+      - name: Build and Package RCP
         run: |
-          mkdir -p release/gateway
-          cp esp-zigbee-sdk/examples/esp_zigbee_gateway/build/esp_zigbee_gateway.bin          release/gateway/
-          cp esp-zigbee-sdk/examples/esp_zigbee_gateway/build/bootloader/bootloader.bin        release/gateway/
-          cp esp-zigbee-sdk/examples/esp_zigbee_gateway/build/partition_table/partition-table.bin release/gateway/
-          cd release && zip -r ../gateway-firmware-${{ github.ref_name }}.zip gateway/
+          . /opt/esp/idf/export.sh
+          cp config/rcp/sdkconfig.defaults $IDF_PATH/examples/openthread/ot_rcp/
+          
+          cd $IDF_PATH/examples/openthread/ot_rcp
+          idf.py set-target esp32h2
+          idf.py build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-gateway
-          path: gateway-firmware-${{ github.ref_name }}.zip
+          mkdir -p ${GITHUB_WORKSPACE}/release/rcp
+          cp build/ot_rcp.bin ${GITHUB_WORKSPACE}/release/rcp/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/rcp/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/rcp/ || true
+          
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r rcp-firmware-${{ github.ref_name }}.zip rcp/
 
-  # ─────────────────────────────────────────────
-  # Build NCP
-  # ─────────────────────────────────────────────
-  release-ncp:
-    name: "Release NCP (ESP32-H2)"
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Clone ESP-Zigbee-SDK
-        run: git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
-
-      - name: Copy sdkconfig
-        run: cp config/ncp/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_ncp/
-
-      - name: Build NCP firmware
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32h2
-          path: esp-zigbee-sdk/examples/esp_zigbee_ncp
-
-      - name: Package NCP binaries
+      - name: Build and Package Gateway
         run: |
-          mkdir -p release/ncp
-          cp esp-zigbee-sdk/examples/esp_zigbee_ncp/build/esp_zigbee_ncp.bin               release/ncp/
-          cp esp-zigbee-sdk/examples/esp_zigbee_ncp/build/bootloader/bootloader.bin          release/ncp/
-          cp esp-zigbee-sdk/examples/esp_zigbee_ncp/build/partition_table/partition-table.bin release/ncp/
-          cd release && zip -r ../ncp-firmware-${{ github.ref_name }}.zip ncp/
+          . /opt/esp/idf/export.sh
+          cp config/gateway/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
+          idf.py set-target esp32s3
+          idf.py build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-ncp
-          path: ncp-firmware-${{ github.ref_name }}.zip
+          mkdir -p ${GITHUB_WORKSPACE}/release/gateway
+          cp build/esp_zigbee_gateway.bin ${GITHUB_WORKSPACE}/release/gateway/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/gateway/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/gateway/ || true
+          
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r gateway-firmware-${{ github.ref_name }}.zip gateway/
 
-  # ─────────────────────────────────────────────
-  # Build HOST
-  # ─────────────────────────────────────────────
-  release-host:
-    name: "Release HOST (ESP32-S3)"
-    runs-on: ubuntu-latest
-    needs: release-ncp
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Clone ESP-Zigbee-SDK
-        run: git clone --recursive ${{ env.ZIGBEE_SDK_REPO }} esp-zigbee-sdk
-
-      - name: Copy sdkconfig
-        run: cp config/host/sdkconfig.defaults esp-zigbee-sdk/examples/esp_zigbee_host/
-
-      - name: Build HOST firmware
-        uses: espressif/esp-idf-ci-action@v1
-        with:
-          esp_idf_version: ${{ env.IDF_VERSION }}
-          target: esp32s3
-          path: esp-zigbee-sdk/examples/esp_zigbee_host
-
-      - name: Package HOST binaries
+      - name: Build and Package NCP
         run: |
-          mkdir -p release/host
-          cp esp-zigbee-sdk/examples/esp_zigbee_host/build/esp_zigbee_host.bin              release/host/
-          cp esp-zigbee-sdk/examples/esp_zigbee_host/build/bootloader/bootloader.bin         release/host/
-          cp esp-zigbee-sdk/examples/esp_zigbee_host/build/partition_table/partition-table.bin release/host/
-          cd release && zip -r ../host-firmware-${{ github.ref_name }}.zip host/
+          . /opt/esp/idf/export.sh
+          cp config/ncp/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp
+          idf.py set-target esp32h2
+          idf.py build
 
-      - uses: actions/upload-artifact@v4
+          mkdir -p ${GITHUB_WORKSPACE}/release/ncp
+          cp build/esp_zigbee_ncp.bin ${GITHUB_WORKSPACE}/release/ncp/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/ncp/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/ncp/ || true
+          
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r ncp-firmware-${{ github.ref_name }}.zip ncp/
+
+      - name: Build and Package HOST
+        run: |
+          . /opt/esp/idf/export.sh
+          cp config/host/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host/
+          
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host
+          idf.py set-target esp32s3
+          idf.py build
+
+          mkdir -p ${GITHUB_WORKSPACE}/release/host
+          cp build/esp_zigbee_host.bin ${GITHUB_WORKSPACE}/release/host/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/host/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/host/ || true
+          
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r host-firmware-${{ github.ref_name }}.zip host/
+
+      - name: Upload Release Zips
+        uses: actions/upload-artifact@v4
         with:
-          name: release-host
-          path: host-firmware-${{ github.ref_name }}.zip
+          name: release-zips
+          path: release/*.zip
+          retention-days: 1
 
   # ─────────────────────────────────────────────
-  # Publish GitHub Release — runs after ALL builds
+  # JOB 2 — Publish GitHub Release
   # ─────────────────────────────────────────────
   publish-release:
     name: "Publish GitHub Release"
     runs-on: ubuntu-latest
-    needs: [release-rcp, release-gateway, release-ncp, release-host]
+    needs: build-and-package
     permissions:
       contents: write
 
     steps:
-      - name: Download all firmware zips
+      - name: Download firmware zips
         uses: actions/download-artifact@v4
         with:
+          name: release-zips
           path: release-assets/
-          merge-multiple: true
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
