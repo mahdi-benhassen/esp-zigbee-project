@@ -39,7 +39,7 @@ jobs:
         run: |
           . /opt/esp/idf/export.sh
           
-          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/zigbee_gateway
           idf.py set-target esp32s3
           idf.py build
 
