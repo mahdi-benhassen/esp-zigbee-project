@@ -25,7 +25,6 @@ jobs:
       - name: Build RCP (ESP32-H2)
         run: |
           . /opt/esp/idf/export.sh
-          cp config/rcp/sdkconfig.defaults $IDF_PATH/examples/openthread/ot_rcp/
           
           cd $IDF_PATH/examples/openthread/ot_rcp
           idf.py set-target esp32h2
@@ -39,7 +38,6 @@ jobs:
       - name: Build Gateway (ESP32-S3)
         run: |
           . /opt/esp/idf/export.sh
-          cp config/gateway/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway/
           
           cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
           idf.py set-target esp32s3
@@ -53,7 +51,6 @@ jobs:
       - name: Build NCP (ESP32-H2)
         run: |
           . /opt/esp/idf/export.sh
-          cp config/ncp/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp/
           
           cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_ncp
           idf.py set-target esp32h2
@@ -67,7 +64,6 @@ jobs:
       - name: Build HOST (ESP32-S3)
         run: |
           . /opt/esp/idf/export.sh
-          cp config/host/sdkconfig.defaults ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host/
           
           cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_host
           idf.py set-target esp32s3
