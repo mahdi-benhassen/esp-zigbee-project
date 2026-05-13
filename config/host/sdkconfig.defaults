@@ -1,9 +1,0 @@
-# HOST firmware sdkconfig.defaults (runs on CoreS3 — ESP32-S3)
-# Pin numbers match the wiring described in the tutorial
-
-# ── UART pins to NCP (Module Gateway H2) ──
-CONFIG_ZB_HOST_UART_RX_PIN=10
-CONFIG_ZB_HOST_UART_TX_PIN=17
-
-# ── UART baud rate (must match NCP side) ──
-CONFIG_ZB_HOST_UART_BAUDRATE=115200
