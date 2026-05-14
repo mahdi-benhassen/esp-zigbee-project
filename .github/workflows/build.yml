@@ -48,6 +48,21 @@ jobs:
           cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
           cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
 
+      - name: Build Node Temp Sensor (ESP32-H2)
+        run: |
+          . /opt/esp/idf/export.sh
+
+          # Navigate into the standalone node project directory
+          cd ${GITHUB_WORKSPACE}/config/node_temp_sensor
+          idf.py set-target esp32h2
+          idf.py build
+
+          # Copy artifacts to the unified artifact folder
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor
+          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:

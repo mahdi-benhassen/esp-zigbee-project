@@ -56,6 +56,23 @@ jobs:
           cd ${GITHUB_WORKSPACE}/release
           zip -r gateway-firmware-${{ github.ref_name }}.zip gateway/
 
+      - name: Build and Package Node Temp Sensor
+        run: |
+          . /opt/esp/idf/export.sh
+
+          cd ${GITHUB_WORKSPACE}/config/node_temp_sensor
+          idf.py set-target esp32h2
+          idf.py build
+
+          mkdir -p ${GITHUB_WORKSPACE}/release/node_temp_sensor
+          # Ensure you use temperature_sensor.bin to match CMakeLists.txt
+          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r node_temp_sensor-firmware-${{ github.ref_name }}.zip node_temp_sensor/
+
       - name: Upload Release Zips
         uses: actions/upload-artifact@v4
         with:
@@ -89,6 +106,7 @@ jobs:
           files: |
             release-assets/rcp-firmware-${{ github.ref_name }}.zip
             release-assets/gateway-firmware-${{ github.ref_name }}.zip
+            release-assets/node_temp_sensor-firmware-${{ github.ref_name }}.zip
           body: |
             ## ESP Zigbee Firmware ${{ github.ref_name }}
 
@@ -97,6 +115,7 @@ jobs:
             |---|---|---|
             | `rcp-firmware-*.zip` | ESP32-H2 | Radio Co-Processor for Gateway |
             | `gateway-firmware-*.zip` | ESP32-S3 (CoreS3) | Zigbee ↔ Wi-Fi Gateway |
+            | `node_temp_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Temperature Sensor) |
 
             ### Flashing
             ```bash
