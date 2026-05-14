@@ -31,7 +31,7 @@ jobs:
           idf.py build
 
           mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/rcp
-          cp build/ot_rcp.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
+          cp build/esp_ot_rcp.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
           cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
           cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/rcp/ || true
 
@@ -44,7 +44,7 @@ jobs:
           idf.py build
 
           mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/gateway
-          cp build/esp_zigbee_gateway.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
+          cp build/zigbee_gateway.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
           cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
           cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/gateway/ || true
 
