@@ -56,22 +56,24 @@ jobs:
           cd ${GITHUB_WORKSPACE}/release
           zip -r gateway-firmware-${{ github.ref_name }}.zip gateway/
 
-      - name: Build and Package Node Temp Sensor
+      - name: Build Node Temp Sensor (ESP32-H2)
         run: |
           . /opt/esp/idf/export.sh
 
+          # FIX: Find the 'utils' folder in the cloned SDK and copy it to your workspace root.
+          # This satisfies the "../../../utils/..." relative paths in idf_component.yml
+          cp -r $(find ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples -type d -name "utils") ${GITHUB_WORKSPACE}/ || true
+
+          # Navigate into the standalone node project directory
           cd ${GITHUB_WORKSPACE}/config/node_temp_sensor
           idf.py set-target esp32h2
           idf.py build
 
-          mkdir -p ${GITHUB_WORKSPACE}/release/node_temp_sensor
-          # Ensure you use temperature_sensor.bin to match CMakeLists.txt
-          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
-          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
-          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
-
-          cd ${GITHUB_WORKSPACE}/release
-          zip -r node_temp_sensor-firmware-${{ github.ref_name }}.zip node_temp_sensor/
+          # Copy artifacts
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor
+          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
 
       - name: Upload Release Zips
         uses: actions/upload-artifact@v4
