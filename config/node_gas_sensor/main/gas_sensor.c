@@ -76,16 +76,22 @@ static void simulated_gas_sensor_task(void *pvParameters)
                                    EZB_ZCL_CLUSTER_ID_ON_OFF,
                                    EZB_ZCL_CLUSTER_SERVER,
                                    EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
-                                   &s_fan_state);
+                                   EZB_ZCL_STD_MANUF_CODE,
+                                   (uint8_t *)&s_fan_state,
+                                   false);
             esp_zigbee_lock_release();
 
             // Report the Fan State
             ezb_zcl_report_attr_cmd_t report_fan = {
-                .dst_addr_mode = EZB_APS_ADDR_MODE_DST_ADDR_EP_NOT_PRESENT,
-                .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
-                .cluster_id = EZB_ZCL_CLUSTER_ID_ON_OFF,
-                .cluster_role = EZB_ZCL_CLUSTER_SERVER,
-                .attr_id = EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+                .cmd_ctrl = {
+                    .fc.direction = EZB_ZCL_CMD_DIRECTION_TO_CLI,
+                    .dst_addr.addr_mode = EZB_ADDR_MODE_NONE,
+                    .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
+                    .cluster_id = EZB_ZCL_CLUSTER_ID_ON_OFF,
+                },
+                .payload = {
+                    .attr_id = EZB_ZCL_ATTR_ON_OFF_ON_OFF_ID,
+                }
             };
             esp_zigbee_lock_acquire(portMAX_DELAY);
             ezb_zcl_report_attr_cmd_req(&report_fan);
@@ -101,15 +107,21 @@ static void simulated_gas_sensor_task(void *pvParameters)
                                EZB_ZCL_CLUSTER_ID_CARBON_DIOXIDE_MEASUREMENT,
                                EZB_ZCL_CLUSTER_SERVER,
                                EZB_ZCL_ATTR_CARBON_DIOXIDE_MEASUREMENT_MEASURED_VALUE_ID,
-                               &s_co2_ppm);
+                               EZB_ZCL_STD_MANUF_CODE,
+                               (uint8_t *)&s_co2_ppm,
+                               false);
         esp_zigbee_lock_release();
 
         ezb_zcl_report_attr_cmd_t report_co2 = {
-            .dst_addr_mode = EZB_APS_ADDR_MODE_DST_ADDR_EP_NOT_PRESENT,
-            .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
-            .cluster_id = EZB_ZCL_CLUSTER_ID_CARBON_DIOXIDE_MEASUREMENT,
-            .cluster_role = EZB_ZCL_CLUSTER_SERVER,
-            .attr_id = EZB_ZCL_ATTR_CARBON_DIOXIDE_MEASUREMENT_MEASURED_VALUE_ID,
+            .cmd_ctrl = {
+                .fc.direction = EZB_ZCL_CMD_DIRECTION_TO_CLI,
+                .dst_addr.addr_mode = EZB_ADDR_MODE_NONE,
+                .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
+                .cluster_id = EZB_ZCL_CLUSTER_ID_CARBON_DIOXIDE_MEASUREMENT,
+            },
+            .payload = {
+                .attr_id = EZB_ZCL_ATTR_CARBON_DIOXIDE_MEASUREMENT_MEASURED_VALUE_ID,
+            }
         };
         esp_zigbee_lock_acquire(portMAX_DELAY);
         ezb_zcl_report_attr_cmd_req(&report_co2);
@@ -121,15 +133,21 @@ static void simulated_gas_sensor_task(void *pvParameters)
                                EZB_ZCL_CLUSTER_ID_ANALOG_INPUT,
                                EZB_ZCL_CLUSTER_SERVER,
                                EZB_ZCL_ATTR_ANALOG_INPUT_PRESENT_VALUE_ID,
-                               &s_ammonia_ppm);
+                               EZB_ZCL_STD_MANUF_CODE,
+                               (uint8_t *)&s_ammonia_ppm,
+                               false);
         esp_zigbee_lock_release();
 
         ezb_zcl_report_attr_cmd_t report_ammonia = {
-            .dst_addr_mode = EZB_APS_ADDR_MODE_DST_ADDR_EP_NOT_PRESENT,
-            .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
-            .cluster_id = EZB_ZCL_CLUSTER_ID_ANALOG_INPUT,
-            .cluster_role = EZB_ZCL_CLUSTER_SERVER,
-            .attr_id = EZB_ZCL_ATTR_ANALOG_INPUT_PRESENT_VALUE_ID,
+            .cmd_ctrl = {
+                .fc.direction = EZB_ZCL_CMD_DIRECTION_TO_CLI,
+                .dst_addr.addr_mode = EZB_ADDR_MODE_NONE,
+                .src_ep = ESP_ZIGBEE_HA_GAS_SENSOR_EP_ID,
+                .cluster_id = EZB_ZCL_CLUSTER_ID_ANALOG_INPUT,
+            },
+            .payload = {
+                .attr_id = EZB_ZCL_ATTR_ANALOG_INPUT_PRESENT_VALUE_ID,
+            }
         };
         esp_zigbee_lock_acquire(portMAX_DELAY);
         ezb_zcl_report_attr_cmd_req(&report_ammonia);
