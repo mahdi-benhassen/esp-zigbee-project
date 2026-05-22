@@ -17,44 +17,196 @@
 #include "ezbee/zcl/cluster/analog_input_desc.h"
 #include "gas_sensor.h"
 #include <math.h>
+#include "driver/i2c_master.h"
+#include "esp_adc/adc_oneshot.h"
+#include "driver/gpio.h"
 
 static const char *TAG = "ESP_ZIGBEE_GAS_SENSOR";
 
-/* Default values for our simulated sensors */
+#define I2C_SDA_PIN          GPIO_NUM_10
+#define I2C_SCL_PIN          GPIO_NUM_11
+#define AMMONIA_ADC_PIN      GPIO_NUM_1  // ADC1_CH0
+#define FAN_RELAY_PIN        GPIO_NUM_3
+
+#define SCD4X_I2C_ADDR       0x62
+
 static float s_co2_ppm = 400.0f;       // Fresh air base
 static float s_ammonia_ppm = 5.0f;     // Clean coop base
 static uint8_t s_fan_state = 0;        // Off
 
-static void simulated_gas_sensor_task(void *pvParameters)
-{
-    bool co2_increasing = true;
-    bool ammonia_increasing = true;
+static i2c_master_dev_handle_t s_scd4x_handle = NULL;
+static adc_oneshot_unit_handle_t s_adc_handle = NULL;
 
-    while (1) {
-        /* 1. Simulate Carbon Dioxide levels (400 PPM to 2000 PPM) */
-        if (co2_increasing) {
-            s_co2_ppm += 100.0f;
-            if (s_co2_ppm >= 2000.0f) {
-                co2_increasing = false;
-            }
-        } else {
-            s_co2_ppm -= 100.0f;
-            if (s_co2_ppm <= 400.0f) {
-                co2_increasing = true;
+// CRC-8 calculation helper for SCD4x
+static uint8_t scd4x_crc8(const uint8_t *data, size_t len)
+{
+    uint8_t crc = 0xFF;
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++) {
+            if (crc & 0x80) {
+                crc = (crc << 1) ^ 0x31;
+            } else {
+                crc <<= 1;
             }
         }
+    }
+    return crc;
+}
 
-        /* 2. Simulate Ammonia NH3 levels (5 PPM to 40 PPM) */
-        if (ammonia_increasing) {
-            s_ammonia_ppm += 2.5f;
-            if (s_ammonia_ppm >= 40.0f) {
-                ammonia_increasing = false;
-            }
+// Initialize I2C and SCD4x sensor
+static esp_err_t init_scd4x_sensor(void)
+{
+    i2c_master_bus_config_t bus_config = {
+        .i2c_port = I2C_NUM_0,
+        .sda_io_num = I2C_SDA_PIN,
+        .scl_io_num = I2C_SCL_PIN,
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .glitch_ignore_cnt = 7,
+        .flags.enable_internal_pullup = true,
+    };
+    i2c_master_bus_handle_t bus_handle;
+    esp_err_t err = i2c_new_master_bus(&bus_config, &bus_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create I2C master bus: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = SCD4X_I2C_ADDR,
+        .scl_speed_hz = 100000,
+    };
+    err = i2c_master_bus_add_device(bus_handle, &dev_config, &s_scd4x_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add SCD4x device to I2C bus: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Start periodic measurement on SCD4x (command 0x21B1)
+    uint8_t cmd_start[2] = {0x21, 0xB1};
+    err = i2c_master_transmit(s_scd4x_handle, cmd_start, 2, 1000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to send Start Periodic Measurement command to SCD4x: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "SCD4x CO2 sensor initialized successfully on I2C (SDA:%d, SCL:%d)", I2C_SDA_PIN, I2C_SCL_PIN);
+    return ESP_OK;
+}
+
+// Read CO2 concentration from SCD4x
+static esp_err_t read_scd4x_co2(float *co2_val)
+{
+    if (!s_scd4x_handle) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Command to read measurement: 0xEC05
+    uint8_t cmd_read[2] = {0xEC, 0x05};
+    uint8_t rx_data[9] = {0};
+    
+    // Transmit command and receive 9 bytes of response
+    esp_err_t err = i2c_master_transmit_receive(s_scd4x_handle, cmd_read, 2, rx_data, 9, 1000);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "I2C transfer error reading SCD4x: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Validate CO2 data CRC (bytes 0, 1 vs byte 2)
+    if (scd4x_crc8(rx_data, 2) != rx_data[2]) {
+        ESP_LOGE(TAG, "SCD4x CO2 CRC mismatch!");
+        return ESP_ERR_INVALID_CRC;
+    }
+
+    uint16_t co2_raw = (rx_data[0] << 8) | rx_data[1];
+    *co2_val = (float)co2_raw;
+    return ESP_OK;
+}
+
+// Initialize ADC for Ammonia sensor
+static esp_err_t init_ammonia_adc(void)
+{
+    adc_oneshot_unit_init_cfg_t init_config = {
+        .unit_id = ADC_UNIT_1,
+        .clk_src = ADC_DIGI_CLK_SRC_DEFAULT,
+    };
+    esp_err_t err = adc_oneshot_new_unit(&init_config, &s_adc_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize ADC unit: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    adc_oneshot_chan_cfg_t chan_config = {
+        .bitwidth = ADC_BITWIDTH_12,
+        .atten = ADC_ATTEN_DB_12,
+    };
+    // GPIO1 is ADC1_CH0
+    err = adc_oneshot_config_channel(s_adc_handle, ADC_CHANNEL_0, &chan_config);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure ADC channel: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "Ammonia sensor ADC initialized on GPIO%d (ADC1_CH0)", AMMONIA_ADC_PIN);
+    return ESP_OK;
+}
+
+// Read Ammonia level from MQ-137 / electrochemical sensor
+static esp_err_t read_ammonia_ppm(float *ammonia_val)
+{
+    if (!s_adc_handle) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    int raw_val = 0;
+    esp_err_t err = adc_oneshot_read(s_adc_handle, ADC_CHANNEL_0, &raw_val);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read raw ADC: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    // Convert raw ADC (0-4095) to equivalent Ammonia PPM.
+    // Assuming a linear 0-3.3V sensor output for 0-100 PPM NH3:
+    // Voltage = raw_val * 3.3 / 4095.0
+    // PPM = Voltage * (100 / 3.3) = raw_val * 100.0 / 4095.0
+    *ammonia_val = ((float)raw_val * 100.0f) / 4095.0f;
+    return ESP_OK;
+}
+
+// Initialize Ventilation Fan relay GPIO pin
+static void init_fan_relay(void)
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = (1ULL << FAN_RELAY_PIN),
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&io_conf);
+    gpio_set_level(FAN_RELAY_PIN, s_fan_state);
+    ESP_LOGI(TAG, "Ventilation Fan Relay initialized on GPIO%d (initial state: %s)", FAN_RELAY_PIN, s_fan_state ? "ON" : "OFF");
+}
+
+static void real_gas_sensor_task(void *pvParameters)
+{
+    while (1) {
+        float co2_read = 0.0f;
+        float ammonia_read = 0.0f;
+
+        /* 1. Read real Carbon Dioxide levels from SCD4x */
+        if (read_scd4x_co2(&co2_read) == ESP_OK) {
+            s_co2_ppm = co2_read;
         } else {
-            s_ammonia_ppm -= 2.5f;
-            if (s_ammonia_ppm <= 5.0f) {
-                ammonia_increasing = true;
-            }
+            ESP_LOGW(TAG, "Failed to read CO2 sensor, using last value: %.1f PPM", s_co2_ppm);
+        }
+
+        /* 2. Read real Ammonia level from ADC */
+        if (read_ammonia_ppm(&ammonia_read) == ESP_OK) {
+            s_ammonia_ppm = ammonia_read;
+        } else {
+            ESP_LOGW(TAG, "Failed to read Ammonia sensor, using last value: %.1f PPM", s_ammonia_ppm);
         }
 
         /* 3. Automatic Ventilation Actuator Logic */
@@ -68,6 +220,7 @@ static void simulated_gas_sensor_task(void *pvParameters)
 
         if (target_fan_state != s_fan_state) {
             s_fan_state = target_fan_state;
+            gpio_set_level(FAN_RELAY_PIN, s_fan_state);
             ESP_LOGI(TAG, "Local Actuator: Ventilation Fan is now %s", s_fan_state ? "ON" : "OFF");
             
             // Update ZCL On/Off attribute
@@ -160,7 +313,21 @@ static void simulated_gas_sensor_task(void *pvParameters)
 static void deferred_driver_init(void)
 {
     ESP_LOGI(TAG, "Initializing gas sensor drivers");
-    xTaskCreate(simulated_gas_sensor_task, "sim_gas_sensor", 4096, NULL, 5, NULL);
+    
+    // Initialize Ventilation Fan relay GPIO
+    init_fan_relay();
+
+    // Initialize Sensirion SCD4x I2C CO2 sensor
+    if (init_scd4x_sensor() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize real SCD4x CO2 sensor");
+    }
+
+    // Initialize Ammonia ADC sensor
+    if (init_ammonia_adc() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize real Ammonia ADC sensor");
+    }
+
+    xTaskCreate(real_gas_sensor_task, "real_gas_sensor", 4096, NULL, 5, NULL);
 }
 
 static void esp_zigbee_alarm_bdb_commissioning(alarm_timer_arg_t arg)
@@ -223,6 +390,7 @@ static void zcl_core_set_attr_value_handler(ezb_zcl_set_attr_value_message_t *me
     if (message->info.cluster_id == EZB_ZCL_CLUSTER_ID_ON_OFF) {
         uint8_t command_state = *(uint8_t *)message->in.attribute.data.value;
         s_fan_state = command_state;
+        gpio_set_level(FAN_RELAY_PIN, s_fan_state);
         ESP_LOGI(TAG, "Actuator: Ventilation Fan turned %s via ZCL write", s_fan_state ? "ON" : "OFF");
     }
 }
