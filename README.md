@@ -32,8 +32,10 @@ esp-zigbee-project/
 │   │   └── sdkconfig.defaults      ← RCP config (ESP32-H2)
 │   ├── node_temp_sensor/
 │   │   └── sdkconfig.defaults      ← Temperature Sensor Node config (ESP32-H2)
-│   └── node_light_sensor/
-│       └── sdkconfig.defaults      ← Light Sensor Node config (ESP32-H2)
+│   ├── node_light_sensor/
+│   │   └── sdkconfig.defaults      ← Light Sensor Node config (ESP32-H2)
+│   └── node_gas_sensor/
+│       └── sdkconfig.defaults      ← Gas Sensor (Ammonia/CO2) Node config (ESP32-H2)
 └── README.md
 ```
 
@@ -113,7 +115,9 @@ push to main/develop
 
 ├── build-node-temp  (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_temp_sensor-firmware
 
-└── build-node-light (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_light_sensor-firmware
+├── build-node-light (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_light_sensor-firmware
+
+└── build-node-gas   (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_gas_sensor-firmware
 ```
 
 ### `release.yml` — Runs on `git tag v*.*.*`
@@ -180,6 +184,15 @@ idf.py erase_flash flash --port /dev/ttyUSB0
 ```bash
 # Flash Light Sensor onto Module Gateway H2
 cd config/node_light_sensor
+idf.py set-target esp32h2
+idf.py build
+idf.py erase_flash flash --port /dev/ttyUSB0
+```
+
+#### Gas (Ammonia/CO2) Sensor & Actuator Node
+```bash
+# Flash Gas Sensor onto Module Gateway H2
+cd config/node_gas_sensor
 idf.py set-target esp32h2
 idf.py build
 idf.py erase_flash flash --port /dev/ttyUSB0

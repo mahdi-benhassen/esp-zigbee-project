@@ -84,6 +84,21 @@ jobs:
           cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/node_light_sensor/ || true
           cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/node_light_sensor/ || true
 
+      - name: Build Node Gas Sensor (ESP32-H2)
+        run: |
+          . /opt/esp/idf/export.sh
+
+          # Navigate into the standalone node project directory
+          cd ${GITHUB_WORKSPACE}/config/node_gas_sensor
+          idf.py set-target esp32h2
+          idf.py build
+
+          # Copy artifacts
+          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/node_gas_sensor
+          cp build/gas_sensor.bin ${GITHUB_WORKSPACE}/build_artifacts/node_gas_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/node_gas_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/node_gas_sensor/ || true
+
       - name: Upload Binaries
         uses: actions/upload-artifact@v4
         with:

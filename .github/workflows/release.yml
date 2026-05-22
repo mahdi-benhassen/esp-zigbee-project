@@ -98,6 +98,24 @@ jobs:
           cd ${GITHUB_WORKSPACE}/release
           zip -r node_light_sensor-firmware-${{ github.ref_name }}.zip node_light_sensor/
 
+      - name: Build and Package Node Gas Sensor
+        run: |
+          . /opt/esp/idf/export.sh
+
+          # Navigate into the standalone node project directory
+          cd ${GITHUB_WORKSPACE}/config/node_gas_sensor
+          idf.py set-target esp32h2
+          idf.py build
+
+          # Copy and package artifacts
+          mkdir -p ${GITHUB_WORKSPACE}/release/node_gas_sensor
+          cp build/gas_sensor.bin ${GITHUB_WORKSPACE}/release/node_gas_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/node_gas_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/node_gas_sensor/ || true
+
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r node_gas_sensor-firmware-${{ github.ref_name }}.zip node_gas_sensor/
+
       - name: Upload Release Zips
         uses: actions/upload-artifact@v4
         with:
@@ -133,6 +151,7 @@ jobs:
             release-assets/gateway-firmware-${{ github.ref_name }}.zip
             release-assets/node_temp_sensor-firmware-${{ github.ref_name }}.zip
             release-assets/node_light_sensor-firmware-${{ github.ref_name }}.zip
+            release-assets/node_gas_sensor-firmware-${{ github.ref_name }}.zip
           body: |
             ## ESP Zigbee Firmware ${{ github.ref_name }}
 
@@ -143,6 +162,7 @@ jobs:
             | `gateway-firmware-*.zip` | ESP32-S3 (CoreS3) | Zigbee ↔ Wi-Fi Gateway |
             | `node_temp_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Temperature Sensor) |
             | `node_light_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Light Sensor) |
+            | `node_gas_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Ammonia & CO2 Gas Sensor) |
 
             ### Flashing
             ```bash
