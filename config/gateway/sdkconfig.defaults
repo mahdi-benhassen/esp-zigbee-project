@@ -3,6 +3,13 @@
 # Edit WiFi credentials before flashing to real hardware!
 
 # ── Board pin wiring (CoreS3 ↔ Module Gateway H2) ──
+# Standard Kconfig parameters for SDK Gateway example
+CONFIG_PIN_TO_RCP_RESET=7
+CONFIG_PIN_TO_RCP_BOOT=18
+CONFIG_PIN_TO_RCP_TX=10
+CONFIG_PIN_TO_RCP_RX=17
+
+# Legacy/Alternative parameters for compatibility
 CONFIG_ZIGBEE_GW_RCP_RESET_PIN=7
 CONFIG_ZIGBEE_GW_RCP_BOOT_PIN=18
 CONFIG_ZIGBEE_GW_UART_TX_PIN=10

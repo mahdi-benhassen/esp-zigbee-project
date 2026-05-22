@@ -1,0 +1,9 @@
+# ESP-IDF build artifacts
+**/build/
+**/sdkconfig
+**/sdkconfig.old
+**/dependencies.lock
+**/managed_components/
+
+# Local copy of SDK utils
+/utils/

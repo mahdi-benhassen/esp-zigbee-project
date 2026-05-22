@@ -29,6 +29,7 @@ jobs:
           . /opt/esp/idf/export.sh
           
           cd $IDF_PATH/examples/openthread/ot_rcp
+          cat ${GITHUB_WORKSPACE}/config/rcp/sdkconfig.defaults >> sdkconfig.defaults
           idf.py set-target esp32h2
           idf.py build
 
@@ -44,7 +45,8 @@ jobs:
         run: |
           . /opt/esp/idf/export.sh
           
-          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/esp_zigbee_gateway
+          cd ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples/zigbee_gateway
+          cat ${GITHUB_WORKSPACE}/config/gateway/sdkconfig.defaults >> sdkconfig.defaults
           idf.py set-target esp32s3
           idf.py build
 
@@ -56,7 +58,7 @@ jobs:
           cd ${GITHUB_WORKSPACE}/release
           zip -r gateway-firmware-${{ github.ref_name }}.zip gateway/
 
-      - name: Build Node Temp Sensor (ESP32-H2)
+      - name: Build and Package Node Temp Sensor
         run: |
           . /opt/esp/idf/export.sh
 
@@ -69,11 +71,32 @@ jobs:
           idf.py set-target esp32h2
           idf.py build
 
-          # Copy artifacts
-          mkdir -p ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor
-          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
-          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
-          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/build_artifacts/node_temp_sensor/ || true
+          # Copy and package artifacts
+          mkdir -p ${GITHUB_WORKSPACE}/release/node_temp_sensor
+          cp build/temperature_sensor.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/node_temp_sensor/ || true
+
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r node_temp_sensor-firmware-${{ github.ref_name }}.zip node_temp_sensor/
+
+      - name: Build and Package Node Light Sensor
+        run: |
+          . /opt/esp/idf/export.sh
+
+          # Navigate into the standalone node project directory
+          cd ${GITHUB_WORKSPACE}/config/node_light_sensor
+          idf.py set-target esp32h2
+          idf.py build
+
+          # Copy and package artifacts
+          mkdir -p ${GITHUB_WORKSPACE}/release/node_light_sensor
+          cp build/light_sensor.bin ${GITHUB_WORKSPACE}/release/node_light_sensor/ || true
+          cp build/bootloader/bootloader.bin ${GITHUB_WORKSPACE}/release/node_light_sensor/ || true
+          cp build/partition_table/partition-table.bin ${GITHUB_WORKSPACE}/release/node_light_sensor/ || true
+
+          cd ${GITHUB_WORKSPACE}/release
+          zip -r node_light_sensor-firmware-${{ github.ref_name }}.zip node_light_sensor/
 
       - name: Upload Release Zips
         uses: actions/upload-artifact@v4
@@ -109,6 +132,7 @@ jobs:
             release-assets/rcp-firmware-${{ github.ref_name }}.zip
             release-assets/gateway-firmware-${{ github.ref_name }}.zip
             release-assets/node_temp_sensor-firmware-${{ github.ref_name }}.zip
+            release-assets/node_light_sensor-firmware-${{ github.ref_name }}.zip
           body: |
             ## ESP Zigbee Firmware ${{ github.ref_name }}
 
@@ -118,6 +142,7 @@ jobs:
             | `rcp-firmware-*.zip` | ESP32-H2 | Radio Co-Processor for Gateway |
             | `gateway-firmware-*.zip` | ESP32-S3 (CoreS3) | Zigbee ↔ Wi-Fi Gateway |
             | `node_temp_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Temperature Sensor) |
+            | `node_light_sensor-firmware-*.zip` | ESP32-H2 | Zigbee End Device (Light Sensor) |
 
             ### Flashing
             ```bash

@@ -1,6 +1,6 @@
-# ESP Zigbee Gateway & NCP Node
+# ESP Zigbee Gateway & Sensor Nodes
 
-CI/CD managed builds for the **ESP Zigbee Gateway** and **ESP Zigbee NCP** examples,
+CI/CD managed builds for the **ESP Zigbee Gateway**, **Temperature Sensor Node**, and **Light Sensor Node** examples,
 targeting M5Stack **CoreS3** (ESP32-S3) + **Module Gateway H2** (ESP32-H2).
 
 ![Build Status](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build.yml/badge.svg)
@@ -11,8 +11,8 @@ targeting M5Stack **CoreS3** (ESP32-S3) + **Module Gateway H2** (ESP32-H2).
 
 | Board | Chip | Role |
 |---|---|---|
-| CoreS3 | ESP32-S3 | Gateway host / NCP host |
-| Module Gateway H2 | ESP32-H2 | RCP (Gateway mode) / NCP (Node mode) |
+| CoreS3 | ESP32-S3 | Gateway host |
+| Module Gateway H2 | ESP32-H2 | RCP (Gateway mode) / Standalone Sensor Nodes (End Device) |
 | ESP32 Downloader | — | Flashing tool |
 
 ---
@@ -23,17 +23,17 @@ targeting M5Stack **CoreS3** (ESP32-S3) + **Module Gateway H2** (ESP32-H2).
 esp-zigbee-project/
 ├── .github/
 │   └── workflows/
-│       ├── build.yml       ← CI: builds all 4 firmware on every push/PR
+│       ├── build.yml       ← CI: builds all firmware on every push/PR
 │       └── release.yml     ← Release: packages & publishes .bin zips on version tag
 ├── config/
 │   ├── gateway/
-│   │   └── sdkconfig.defaults   ← Gateway pin/WiFi config (CoreS3)
+│   │   └── sdkconfig.defaults      ← Gateway pin/WiFi config (CoreS3)
 │   ├── rcp/
-│   │   └── sdkconfig.defaults   ← RCP config (ESP32-H2)
-│   ├── ncp/
-│   │   └── sdkconfig.defaults   ← NCP pin config (ESP32-H2)
-│   └── host/
-│       └── sdkconfig.defaults   ← Host pin config (CoreS3)
+│   │   └── sdkconfig.defaults      ← RCP config (ESP32-H2)
+│   ├── node_temp_sensor/
+│   │   └── sdkconfig.defaults      ← Temperature Sensor Node config (ESP32-H2)
+│   └── node_light_sensor/
+│       └── sdkconfig.defaults      ← Light Sensor Node config (ESP32-H2)
 └── README.md
 ```
 
@@ -111,9 +111,9 @@ push to main/develop
 │                                                                          │
 └── build-gateway (ESP32-S3)  needs: build-rcp ──────────────────────►  ✅ artifact: gateway-firmware
 
-├── build-ncp    (ESP32-H2)   ─────────────────────────────────────────►  ✅ artifact: ncp-firmware
-│                                                                          │
-└── build-host   (ESP32-S3)   needs: build-ncp ──────────────────────►  ✅ artifact: host-firmware
+├── build-node-temp  (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_temp_sensor-firmware
+
+└── build-node-light (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_light_sensor-firmware
 ```
 
 ### `release.yml` — Runs on `git tag v*.*.*`
@@ -165,26 +165,30 @@ idf.py build
 idf.py erase_flash flash --port /dev/ttyUSB1   # S3 port
 ```
 
-### NCP Node (2 chips)
+### Sensor Nodes (ESP32-H2 Standalone)
 
+#### Temperature Sensor Node
 ```bash
-# 1. Flash NCP onto Module Gateway H2
-cd esp-zigbee-sdk/examples/esp_zigbee_ncp
+# Flash Temperature Sensor onto Module Gateway H2
+cd config/node_temp_sensor
 idf.py set-target esp32h2
 idf.py build
 idf.py erase_flash flash --port /dev/ttyUSB0
+```
 
-# 2. Flash Host onto CoreS3
-cd esp-zigbee-sdk/examples/esp_zigbee_host
-idf.py set-target esp32s3
+#### Light Sensor Node
+```bash
+# Flash Light Sensor onto Module Gateway H2
+cd config/node_light_sensor
+idf.py set-target esp32h2
 idf.py build
-idf.py erase_flash flash --port /dev/ttyUSB1
+idf.py erase_flash flash --port /dev/ttyUSB0
 ```
 
 ### Monitor logs
 
 ```bash
-idf.py monitor --port /dev/ttyUSB1    # 115200 bps
+idf.py monitor --port /dev/ttyUSB0    # 115200 bps
 ```
 
 Expected Gateway log output:
@@ -193,10 +197,11 @@ Expected Gateway log output:
 - Zigbee network created ✅
 - Network open for device joining ✅
 
-Expected NCP log output:
-- Zigbee stack initialized (NCP side) ✅
-- Host connected to NCP ✅
-- Zigbee network created in Coordinator mode ✅
+Expected Sensor Node log output:
+- Start ESP Zigbee Stack ✅
+- Initialize Zigbee stack ✅
+- Joined network successfully ✅
+- Simulated Sensor updates or Sent ZCL Report Attribute request ✅
 
 ---
 
