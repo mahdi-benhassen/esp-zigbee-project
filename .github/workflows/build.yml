@@ -22,6 +22,12 @@ jobs:
       - name: Clone ESP-Zigbee-SDK
         run: git clone --recursive https://github.com/espressif/esp-zigbee-sdk.git
 
+      - name: Prepare utils for node builds
+        run: |
+          # Copy the 'utils' folder from the cloned SDK to the workspace root.
+          # This satisfies the "../../../utils/..." relative paths in node idf_component.yml files.
+          cp -r $(find ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples -type d -name "utils") ${GITHUB_WORKSPACE}/
+
       - name: Build RCP (ESP32-H2)
         run: |
           . /opt/esp/idf/export.sh
@@ -53,10 +59,6 @@ jobs:
       - name: Build Node Temp Sensor (ESP32-H2)
         run: |
           . /opt/esp/idf/export.sh
-
-          # FIX: Find the 'utils' folder in the cloned SDK and copy it to your workspace root.
-          # This satisfies the "../../../utils/..." relative paths in idf_component.yml
-          cp -r $(find ${GITHUB_WORKSPACE}/esp-zigbee-sdk/examples -type d -name "utils") ${GITHUB_WORKSPACE}/ || true
 
           # Navigate into the standalone node project directory
           cd ${GITHUB_WORKSPACE}/config/node_temp_sensor

@@ -9,14 +9,12 @@
 #include "freertos/task.h"
 #include "nvs_flash.h"
 #include "esp_check.h"
-#include "switch_driver.h"
 #include "alarm_timer.h"
 #include "esp_zigbee.h"
 #include "ezbee/zha.h"
 #include "ezbee/zcl/cluster/carbon_dioxide_measurement_desc.h"
 #include "ezbee/zcl/cluster/analog_input_desc.h"
 #include "gas_sensor.h"
-#include <math.h>
 #include "driver/i2c_master.h"
 #include "esp_adc/adc_oneshot.h"
 #include "driver/gpio.h"
@@ -494,6 +492,7 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    ESP_ERROR_CHECK(nvs_flash_init_partition(ESP_ZIGBEE_STORAGE_PARTITION_NAME));
 
     ESP_LOGI(TAG, "Starting Smart Poultry Ammonia/CO2 Gas Sensor & Actuator Node");
     xTaskCreate(esp_zigbee_stack_main_task, "Zigbee_main", 4096 * 2, NULL, 5, NULL);

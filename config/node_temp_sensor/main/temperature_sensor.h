@@ -42,4 +42,4 @@
     {                                                    \
         .device_config = ESP_ZIGBEE_ZED_CONFIG(),        \
         .platform_config = ESP_ZIGBEE_PLATFORM_CONFIG(), \
-    };
+    }

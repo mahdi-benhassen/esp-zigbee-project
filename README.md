@@ -1,9 +1,9 @@
 # ESP Zigbee Gateway & Sensor Nodes
 
-CI/CD managed builds for the **ESP Zigbee Gateway**, **Temperature Sensor Node**, and **Light Sensor Node** examples,
+CI/CD managed builds for the **ESP Zigbee Gateway**, **Temperature Sensor Node**, **Light Sensor Node**, and **Ammonia/CO2 Gas Sensor Node** examples,
 targeting M5Stack **CoreS3** (ESP32-S3) + **Module Gateway H2** (ESP32-H2).
 
-![Build Status](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build.yml/badge.svg)
+![Build Status](https://github.com/mahdi-benhassen/esp-zigbee-project/actions/workflows/build.yml/badge.svg)
 
 ---
 
@@ -30,14 +30,29 @@ esp-zigbee-project/
 │   │   └── sdkconfig.defaults      ← Gateway pin/WiFi config (CoreS3)
 │   ├── rcp/
 │   │   └── sdkconfig.defaults      ← RCP config (ESP32-H2)
-│   ├── node_temp_sensor/
-│   │   └── sdkconfig.defaults      ← Temperature Sensor Node config (ESP32-H2)
-│   ├── node_light_sensor/
-│   │   └── sdkconfig.defaults      ← Light Sensor Node config (ESP32-H2)
-│   └── node_gas_sensor/
-│       └── sdkconfig.defaults      ← Gas Sensor (Ammonia/CO2) Node config (ESP32-H2)
+│   ├── node_temp_sensor/           ← Standalone IDF project (ESP32-H2)
+│   │   ├── CMakeLists.txt
+│   │   ├── partitions.csv
+│   │   ├── sdkconfig.defaults
+│   │   └── main/                   ← Temperature sensor application source
+│   ├── node_light_sensor/          ← Standalone IDF project (ESP32-H2)
+│   │   ├── CMakeLists.txt
+│   │   ├── partitions.csv
+│   │   ├── sdkconfig.defaults
+│   │   └── main/                   ← Light sensor application source
+│   └── node_gas_sensor/            ← Standalone IDF project (ESP32-H2)
+│       ├── CMakeLists.txt
+│       ├── partitions.csv
+│       ├── sdkconfig.defaults
+│       └── main/                   ← Ammonia/CO2 gas sensor & fan actuator source
+├── docs/                           ← Reference PDFs (gateway / border router tutorials)
 └── README.md
 ```
+
+> **Note:** the node projects reference shared utility components (`utils/switch_driver`,
+> `utils/temp_sensor_driver`, `utils/alarm_timer`) via relative paths. The `utils/` directory
+> is gitignored and is copied from the ESP-Zigbee-SDK at build time (CI does this
+> automatically — see [Flashing Firmware Locally](#flashing-firmware-locally) for local setup).
 
 ---
 
@@ -54,7 +69,7 @@ esp-zigbee-project/
 
 ```bash
 # Clone this repo
-git clone https://github.com/YOUR_USERNAME/esp-zigbee-project.git
+git clone https://github.com/mahdi-benhassen/esp-zigbee-project.git
 cd esp-zigbee-project
 ```
 
@@ -64,7 +79,7 @@ Or start from scratch:
 mkdir esp-zigbee-project && cd esp-zigbee-project
 git init
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/esp-zigbee-project.git
+git remote add origin https://github.com/mahdi-benhassen/esp-zigbee-project.git
 ```
 
 ### Step 3 — Add your Wi-Fi credentials (Gateway only)
@@ -88,7 +103,7 @@ git push -u origin main
 ```
 
 GitHub Actions will automatically trigger the `build.yml` workflow.
-Watch it at: `https://github.com/YOUR_USERNAME/esp-zigbee-project/actions`
+Watch it at: `https://github.com/mahdi-benhassen/esp-zigbee-project/actions`
 
 ### Step 5 — Publish a release
 
@@ -97,7 +112,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-This triggers `release.yml`, which builds all four firmware packages and attaches
+This triggers `release.yml`, which builds all five firmware packages and attaches
 them as `.zip` files to a GitHub Release. Download from the **Releases** page.
 
 ---
@@ -106,25 +121,28 @@ them as `.zip` files to a GitHub Release. Download from the **Releases** page.
 
 ### `build.yml` — Runs on every push / pull request
 
+A single `build-all` job runs every build step sequentially in one container
+(`espressif/idf:release-v5.3`), then uploads a combined artifact:
+
 ```
-push to main/develop
+build-all (ubuntu-latest, container: espressif/idf:release-v5.3)
 │
-├── build-rcp    (ESP32-H2)   ─────────────────────────────────────────►  ✅ artifact: rcp-firmware
-│                                                                          │
-└── build-gateway (ESP32-S3)  needs: build-rcp ──────────────────────►  ✅ artifact: gateway-firmware
-
-├── build-node-temp  (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_temp_sensor-firmware
-
-├── build-node-light (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_light_sensor-firmware
-
-└── build-node-gas   (ESP32-H2) ───────────────────────────────────────►  ✅ artifact: node_gas_sensor-firmware
+├── Clone ESP-Zigbee-SDK + prepare utils/
+├── Build RCP            (ESP32-H2)  ►  build_artifacts/rcp/
+├── Build Gateway        (ESP32-S3)  ►  build_artifacts/gateway/
+├── Build Node Temp      (ESP32-H2)  ►  build_artifacts/node_temp_sensor/
+├── Build Node Light     (ESP32-H2)  ►  build_artifacts/node_light_sensor/
+└── Build Node Gas       (ESP32-H2)  ►  build_artifacts/node_gas_sensor/
+                                        │
+                                        └── upload-artifact: zigbee-firmware-binaries
 ```
 
 ### `release.yml` — Runs on `git tag v*.*.*`
 
-Same jobs, but also:
-- Packages binaries into `.zip` files per firmware type
-- Creates a GitHub Release with all zips attached
+Same build steps as `build.yml`, but also:
+- Packages each firmware's binaries into a `.zip` file
+- Uploads the zips as the `release-zips` artifact
+- A second `publish-release` job creates a GitHub Release with all five zips attached
 - Auto-generates release notes from commits
 
 ---
@@ -151,7 +169,16 @@ Same jobs, but also:
 
 ## Flashing Firmware Locally
 
-> Requires ESP-IDF v5.3.1. Run `. ./export.sh` first.
+> Requires ESP-IDF v5.3+. Run `. ./export.sh` first.
+
+> **Note — Sensor Nodes only:** the node projects under `config/node_*/` reference
+> shared utility components (`utils/switch_driver`, `utils/temp_sensor_driver`,
+> `utils/alarm_timer`) via relative paths. These `utils/` are gitignored, so copy
+> them from the ESP-Zigbee-SDK before building a node locally:
+> ```bash
+> git clone --recursive https://github.com/espressif/esp-zigbee-sdk.git
+> cp -r esp-zigbee-sdk/examples/utils ./utils
+> ```
 
 ### Gateway (2 chips)
 
@@ -163,7 +190,7 @@ idf.py build
 idf.py erase_flash flash --port /dev/ttyUSB0   # H2 port
 
 # 2. Flash Gateway onto CoreS3
-cd esp-zigbee-sdk/examples/esp_zigbee_gateway
+cd esp-zigbee-sdk/examples/zigbee_gateway
 idf.py set-target esp32s3
 idf.py build
 idf.py erase_flash flash --port /dev/ttyUSB1   # S3 port
@@ -243,8 +270,10 @@ Add this step **before** the `esp-idf-ci-action` step in the gateway job.
 
 ## ESP-IDF Version
 
-Both workflows pin to **ESP-IDF v5.3.1** as recommended by the M5Stack tutorials.
-To upgrade, change the `IDF_VERSION` env variable at the top of each workflow file.
+Both workflows use the **ESP-IDF v5.3** release line via the
+`espressif/idf:release-v5.3` container image. For local development, install
+ESP-IDF v5.3 or newer. To upgrade the CI, change the `container:` image in each
+workflow file.
 
 ---
 
