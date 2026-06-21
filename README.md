@@ -98,7 +98,7 @@ CONFIG_EXAMPLE_WIFI_PASSWORD="MyPassword123"
 
 ```bash
 git add .
-git commit -m "Initial commit: Zigbee GW + NCP workflows"
+git commit -m "Initial commit: Zigbee RCP + Gateway workflows"
 git push -u origin main
 ```
 

@@ -13,6 +13,10 @@ jobs:
     name: "Build and Package Binaries"
     runs-on: ubuntu-latest
     container: espressif/idf:release-v5.3
+    # Build job only needs to read source and upload artifacts; release
+    # creation (contents: write) is done by the publish-release job below.
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository

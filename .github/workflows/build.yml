@@ -6,6 +6,16 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Least-privilege: this workflow only builds and uploads artifacts, it does not
+# push to the repo or create releases.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref (avoids redundant CI on rapid pushes).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # ─────────────────────────────────────────────
   # Build All Firmware Binaries in One Container

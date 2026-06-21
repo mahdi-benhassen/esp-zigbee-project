@@ -173,7 +173,7 @@ static esp_err_t read_ammonia_ppm(float *ammonia_val)
 }
 
 // Initialize Ventilation Fan relay GPIO pin
-static void init_fan_relay(void)
+static esp_err_t init_fan_relay(void)
 {
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << FAN_RELAY_PIN),
@@ -182,13 +182,23 @@ static void init_fan_relay(void)
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
         .intr_type = GPIO_INTR_DISABLE,
     };
-    gpio_config(&io_conf);
+    esp_err_t err = gpio_config(&io_conf);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure Fan Relay GPIO%d: %s", FAN_RELAY_PIN, esp_err_to_name(err));
+        return err;
+    }
     gpio_set_level(FAN_RELAY_PIN, s_fan_state);
     ESP_LOGI(TAG, "Ventilation Fan Relay initialized on GPIO%d (initial state: %s)", FAN_RELAY_PIN, s_fan_state ? "ON" : "OFF");
+    return ESP_OK;
 }
 
 static void real_gas_sensor_task(void *pvParameters)
 {
+    // SCD4x: the first measurement is only available ~5s after Start Periodic
+    // Measurement (0x21B1). Wait before the first read to avoid a guaranteed
+    // failure on the first iteration.
+    vTaskDelay(pdMS_TO_TICKS(5000));
+
     while (1) {
         float co2_read = 0.0f;
         float ammonia_read = 0.0f;
@@ -313,7 +323,9 @@ static void deferred_driver_init(void)
     ESP_LOGI(TAG, "Initializing gas sensor drivers");
     
     // Initialize Ventilation Fan relay GPIO
-    init_fan_relay();
+    if (init_fan_relay() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize Ventilation Fan relay");
+    }
 
     // Initialize Sensirion SCD4x I2C CO2 sensor
     if (init_scd4x_sensor() != ESP_OK) {
